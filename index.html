@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tier List Maker</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Font Awesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- html2canvas for Exporting as Image -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            tierS: '#ff7f7f',
+            tierA: '#ffbf7f',
+            tierB: '#ffdf7f',
+            tierC: '#ffff7f',
+            tierD: '#bfff7f',
+            tierF: '#7fff7f',
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+    
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #121216;
+      color: #e2e8f0;
+      user-select: none;
+    }
+
+    /* Custom scrollbar */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #1e1e24;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #3f3f46;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #52525b;
+    }
+
+    /* Dragging Visual FX */
+    .dragging {
+      opacity: 0.4;
+      transform: scale(0.95);
+    }
+    
+    .drag-over-tier {
+      background-color: rgba(255, 255, 255, 0.06) !important;
+      outline: 2px dashed #6366f1;
+      outline-offset: -2px;
+    }
+
+    .item-card {
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .item-card:hover {
+      transform: translateY(-2px);
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between bg-[#121216]">
+
+  <!-- Header & Toolbar -->
+  <header class="bg-[#18181c] border-b border-zinc-800 sticky top-0 z-30 shadow-md">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-4">
+      
+      <!-- Title -->
+      <div class="flex items-center space-x-3">
+        <div class="p-2 bg-indigo-600 rounded-lg text-white shadow-lg shadow-indigo-600/30">
+          <i class="fa-solid font-bold text-xl fa-layer-group"></i>
+        </div>
+        <div>
+          <h1 class="font-extrabold text-xl tracking-tight text-white flex items-center gap-2">
+            Tier List Maker
+          </h1>
+          <p class="text-xs text-zinc-400">Drag to order &bull; Left click left/right zone to edit item</p>
+        </div>
+      </div>
+
+      <!-- Action Controls -->
+      <div class="flex items-center gap-2 flex-wrap">
+        <button id="btn-add-item" class="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white rounded-lg text-sm font-semibold transition flex items-center gap-2 shadow-lg shadow-indigo-600/20">
+          <i class="fa-solid fa-plus text-xs"></i> Add Item
+        </button>
+
+        <button id="btn-add-tier" class="px-3.5 py-2 bg-zinc-800 hover:bg-zinc-700 active:bg-zinc-600 text-zinc-200 border border-zinc-700 rounded-lg text-sm font-semibold transition flex items-center gap-2">
+          <i class="fa-solid fa-folder-plus text-xs"></i> Add Tier
+        </button>
+
+        <button id="btn-reset" class="px-3 py-2 bg-zinc-800 hover:bg-red-950/40 hover:text-red-400 hover:border-red-800/60 active:bg-red-900/40 text-zinc-300 border border-zinc-700 rounded-lg text-sm font-semibold transition flex items-center gap-1.5">
+          <i class="fa-solid fa-rotate-right text-xs"></i> Reset
+        </button>
+
+        <button id="btn-export" class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white rounded-lg text-sm font-semibold transition flex items-center gap-2 shadow-lg shadow-emerald-600/20">
+          <i class="fa-solid fa-download text-xs"></i> Export Image
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Tier Board -->
+  <main class="max-w-7xl w-full mx-auto p-4 sm:p-6 flex-grow flex flex-col gap-6">
+
+    <!-- Container for Rendered Tiers -->
+    <div id="tier-board" class="flex flex-col gap-2 rounded-xl overflow-hidden border border-zinc-800 bg-[#0d0d11] p-2 shadow-2xl">
+      <!-- Tiers are rendered dynamically here -->
+    </div>
+
+    <!-- Unranked Pool Section -->
+    <div class="bg-[#18181c] border border-zinc-800 rounded-xl p-4 shadow-lg flex flex-col gap-3">
+      <div class="flex items-center justify-between pb-2 border-b border-zinc-800/80">
+        <h2 class="text-sm font-bold tracking-wider text-zinc-400 uppercase flex items-center gap-2">
+          <i class="fa-solid fa-box-archive text-indigo-400"></i> Unranked Pool
+        </h2>
+        <span id="pool-count" class="text-xs bg-zinc-800 text-zinc-400 px-2.5 py-0.5 rounded-full font-mono">0 items</span>
+      </div>
+
+      <!-- Item Drop Target (Unranked Pool) -->
+      <div id="unranked-pool" class="tier-drop-zone min-h-[90px] p-2 flex flex-wrap gap-2.5 items-center align-content-start rounded-lg bg-[#121216] border border-dashed border-zinc-700/60 transition-all">
+        <!-- Unranked items drop here -->
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="py-4 text-center text-xs text-zinc-500 border-t border-zinc-800/60">
+    Tier List Maker &bull; Built with Tailwind & HTML5 Drag & Drop
+  </footer>
+
+  <!-- MODAL 1: Add/Edit Item Modal -->
+  <div id="item-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+    <div class="bg-[#18181c] border border-zinc-700 rounded-xl max-w-md w-full p-6 shadow-2xl flex flex-col gap-4 animate-fade-in">
+      <div class="flex justify-between items-center pb-2 border-b border-zinc-800">
+        <h3 id="item-modal-title" class="text-lg font-bold text-white flex items-center gap-2">
+          <i class="fa-solid fa-pen-to-square text-indigo-400"></i> Edit Item
+        </h3>
+        <button id="close-item-modal" class="text-zinc-400 hover:text-white text-lg px-2 py-1 rounded">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="flex flex-col gap-3">
+        <div>
+          <label class="block text-xs font-semibold text-zinc-400 uppercase mb-1">Item Title / Text</label>
+          <input type="text" id="item-text-input" class="w-full bg-[#121216] border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500" placeholder="e.g. Legendary Item">
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-zinc-400 uppercase mb-1">Image URL (Optional)</label>
+          <input type="url" id="item-image-input" class="w-full bg-[#121216] border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500" placeholder="https://example.com/image.png">
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-zinc-400 uppercase mb-1">Assigned Tier</label>
+          <select id="item-tier-select" class="w-full bg-[#121216] border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500">
+            <!-- Options populated dynamically -->
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-zinc-400 uppercase mb-1">Custom Background Color</label>
+          <div class="flex items-center gap-2">
+            <input type="color" id="item-color-input" class="h-9 w-12 bg-transparent cursor-pointer rounded border border-zinc-700">
+            <button type="button" id="item-color-reset" class="text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-3 py-2 rounded-lg border border-zinc-700">
+              Reset to Tier Color
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex justify-between items-center pt-3 border-t border-zinc-800 mt-2">
+        <button id="btn-delete-item" class="px-3.5 py-2 bg-red-950/60 hover:bg-red-900 text-red-300 border border-red-800 rounded-lg text-sm font-semibold transition flex items-center gap-1.5">
+          <i class="fa-solid fa-trash-can"></i> Delete
+        </button>
+
+        <div class="flex gap-2">
+          <button id="btn-cancel-item" class="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-lg text-sm font-semibold transition">
+            Cancel
+          </button>
+          <button id="btn-save-item" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-semibold transition shadow-md">
+            Save Changes
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 2: Edit Tier Settings Modal -->
+  <div id="tier-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+    <div class="bg-[#18181c] border border-zinc-700 rounded-xl max-w-md w-full p-6 shadow-2xl flex flex-col gap-4">
+      <div class="flex justify-between items-center pb-2 border-b border-zinc-800">
+        <h3 class="text-lg font-bold text-white flex items-center gap-2">
+          <i class="fa-solid fa-sliders text-indigo-400"></i> Tier Settings
+        </h3>
+        <button id="close-tier-modal" class="text-zinc-400 hover:text-white text-lg px-2 py-1 rounded">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="flex flex-col gap-3">
+        <div>
+          <label class="block text-xs font-semibold text-zinc-400 uppercase mb-1">Tier Name</label>
+          <input type="text" id="tier-name-input" class="w-full bg-[#121216] border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500">
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-zinc-400 uppercase mb-1">Header Background Color</label>
+          <div class="flex items-center gap-3">
+            <input type="color" id="tier-color-input" class="h-10 w-16 bg-transparent cursor-pointer rounded border border-zinc-700">
+            <div id="preset-colors" class="flex gap-1.5 flex-wrap">
+              <!-- Preset palette buttons -->
+              <button data-color="#ff7f7f" class="w-6 h-6 rounded-full bg-[#ff7f7f] border border-white/20 hover:scale-110 transition"></button>
+              <button data-color="#ffbf7f" class="w-6 h-6 rounded-full bg-[#ffbf7f] border border-white/20 hover:scale-110 transition"></button>
+              <button data-color="#ffdf7f" class="w-6 h-6 rounded-full bg-[#ffdf7f] border border-white/20 hover:scale-110 transition"></button>
+              <button data-color="#ffff7f" class="w-6 h-6 rounded-full bg-[#ffff7f] border border-white/20 hover:scale-110 transition"></button>
+              <button data-color="#bfff7f" class="w-6 h-6 rounded-full bg-[#bfff7f] border border-white/20 hover:scale-110 transition"></button>
+              <button data-color="#7fff7f" class="w-6 h-6 rounded-full bg-[#7fff7f] border border-white/20 hover:scale-110 transition"></button>
+              <button data-color="#7fbfff" class="w-6 h-6 rounded-full bg-[#7fbfff] border border-white/20 hover:scale-110 transition"></button>
+              <button data-color="#ff7fff" class="w-6 h-6 rounded-full bg-[#ff7fff] border border-white/20 hover:scale-110 transition"></button>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex flex-col gap-2 pt-2 border-t border-zinc-800">
+          <label class="block text-xs font-semibold text-zinc-400 uppercase">Tier Actions</label>
+          <div class="grid grid-cols-2 gap-2">
+            <button id="btn-move-tier-up" class="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded text-xs font-semibold flex items-center justify-center gap-1 border border-zinc-700">
+              <i class="fa-solid fa-arrow-up"></i> Move Up
+            </button>
+            <button id="btn-move-tier-down" class="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded text-xs font-semibold flex items-center justify-center gap-1 border border-zinc-700">
+              <i class="fa-solid fa-arrow-down"></i> Move Down
+            </button>
+            <button id="btn-clear-tier" class="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-amber-300 rounded text-xs font-semibold flex items-center justify-center gap-1 border border-zinc-700">
+              <i class="fa-solid fa-broom"></i> Clear Items
+            </button>
+            <button id="btn-delete-tier" class="px-3 py-1.5 bg-red-950/60 hover:bg-red-900 text-red-300 rounded text-xs font-semibold flex items-center justify-center gap-1 border border-red-800">
+              <i class="fa-solid fa-trash"></i> Delete Tier
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex justify-end gap-2 pt-3 border-t border-zinc-800 mt-2">
+        <button id="btn-cancel-tier" class="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-lg text-sm font-semibold transition">
+          Cancel
+        </button>
+        <button id="btn-save-tier" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-semibold transition shadow-md">
+          Save Settings
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Notification Toast Container -->
+  <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+  <!-- Main JavaScript Logic -->
+  <script>
+    // Initial State & Data Store
+    const DEFAULT_TIERS = [
+      { id: 'tier-s', name: 'S', color: '#ff7f7f' },
+      { id: 'tier-a', name: 'A', color: '#ffbf7f' },
+      { id: 'tier-b', name: 'B', color: '#ffdf7f' },
+      { id: 'tier-c', name: 'C', color: '#ffff7f' },
+      { id: 'tier-d', name: 'D', color: '#bfff7f' },
+      { id: 'tier-f', name: 'F', color: '#7fff7f' }
+    ];
+
+    const DEFAULT_ITEMS = [
+      { id: 'item-1', text: 'God Tier', tierId: 'tier-s', color: null, image: '' },
+      { id: 'item-2', text: 'Overpowered', tierId: 'tier-s', color: null, image: '' },
+      { id: 'item-3', text: 'Great Choice', tierId: 'tier-a', color: null, image: '' },
+      { id: 'item-4', text: 'Solid Pick', tierId: 'tier-b', color: null, image: '' },
+      { id: 'item-5', text: 'Average', tierId: 'tier-c', color: null, image: '' },
+      { id: 'item-6', text: 'Needs Buff', tierId: 'tier-d', color: null, image: '' },
+      { id: 'item-7', text: 'Unplayable', tierId: 'tier-f', color: null, image: '' },
+      { id: 'item-8', text: 'Wildcard', tierId: 'unranked', color: null, image: '' }
+    ];
+
+    let tiers = JSON.parse(localStorage.getItem('tierlist_tiers')) || DEFAULT_TIERS;
+    let items = JSON.parse(localStorage.getItem('tierlist_items')) || DEFAULT_ITEMS;
+
+    let activeEditingItemId = null;
+    let activeEditingTierId = null;
+    let draggedItemId = null;
+
+    // DOM Elements
+    const tierBoardEl = document.getElementById('tier-board');
+    const unrankedPoolEl = document.getElementById('unranked-pool');
+    const poolCountEl = document.getElementById('pool-count');
+
+    // Modals
+    const itemModal = document.getElementById('item-modal');
+    const tierModal = document.getElementById('tier-modal');
+
+    // Save state to Local Storage
+    function saveData() {
+      localStorage.setItem('tierlist_tiers', JSON.stringify(tiers));
+      localStorage.setItem('tierlist_items', JSON.stringify(items));
+    }
+
+    // Helper: Determine text contrast color (dark or light text) for tier background
+    function getContrastColor(hexColor) {
+      if (!hexColor) return '#121212';
+      const hex = hexColor.replace('#', '');
+      const r = parseInt(hex.substring(0, 2), 16) || 0;
+      const g = parseInt(hex.substring(2, 4), 16) || 0;
+      const b = parseInt(hex.substring(4, 6), 16) || 0;
+      const yiq = ((r * 299) + (g * 587) + (b * 114)) / 1000;
+      return (yiq >= 128) ? '#121212' : '#ffffff';
+    }
+
+    // Render Tier List Board
+    function renderBoard() {
+      tierBoardEl.innerHTML = '';
+
+      tiers.forEach(tier => {
+        const textColor = getContrastColor(tier.color);
+        const tierRow = document.createElement('div');
+        tierRow.className = 'flex min-h-[95px] border-b border-zinc-800/80 last:border-0 rounded-lg overflow-hidden bg-[#151519] shadow-sm';
+        tierRow.setAttribute('data-tier-id', tier.id);
+
+        tierRow.innerHTML = `
+          <!-- Tier Header Left Side -->
+          <div class="w-24 sm:w-32 flex-shrink-0 flex items-center justify-between p-3 font-extrabold text-lg sm:text-2xl tracking-tight transition-all relative group cursor-pointer"
+               style="background-color: ${tier.color}; color: ${textColor}; text-shadow: ${textColor === '#ffffff' ? '0 1px 2px rgba(0,0,0,0.6)' : 'none'}"
+               onclick="openTierModal('${tier.id}')">
+            <span class="break-words max-w-[80%] leading-tight">${tier.name}</span>
+            <button class="opacity-0 group-hover:opacity-100 transition-opacity text-xs p-1 rounded hover:bg-black/20" title="Edit Tier Settings">
+              <i class="fa-solid fa-gear"></i>
+            </button>
+          </div>
+
+          <!-- Items Drop Zone (Right side) -->
+          <div class="tier-drop-zone flex-grow p-2.5 flex flex-wrap gap-2.5 items-center align-content-start bg-[#141418] transition-colors"
+               data-tier-id="${tier.id}">
+          </div>
+        `;
+
+        tierBoardEl.appendChild(tierRow);
+      });
+
+      renderItems();
+      attachDragEvents();
+    }
+
+    // Render Items inside Tiers & Pool
+    function renderItems() {
+      // Clear drop zones
+      document.querySelectorAll('.tier-drop-zone').forEach(zone => zone.innerHTML = '');
+
+      let unrankedCount = 0;
+
+      items.forEach(item => {
+        const itemEl = createItemElement(item);
+        if (item.tierId === 'unranked') {
+          unrankedPoolEl.appendChild(itemEl);
+          unrankedCount++;
+        } else {
+          const targetZone = document.querySelector(`.tier-drop-zone[data-tier-id="${item.tierId}"]`);
+          if (targetZone) {
+            targetZone.appendChild(itemEl);
+          } else {
+            // Fallback to unranked if tier doesn't exist
+            item.tierId = 'unranked';
+            unrankedPoolEl.appendChild(itemEl);
+            unrankedCount++;
+          }
+        }
+      });
+
+      poolCountEl.textContent = `${unrankedCount} item${unrankedCount === 1 ? '' : 's'}`;
+    }
+
+    // Create Single Item DOM Element
+    function createItemElement(item) {
+      const parentTier = tiers.find(t => t.id === item.tierId);
+      const bgColor = item.color || (parentTier ? parentTier.color : '#3f3f46');
+      const textColor = getContrastColor(bgColor);
+
+      const el = document.createElement('div');
+      el.className = 'item-card relative flex items-center justify-between rounded-lg shadow-md border border-black/20 cursor-grab active:cursor-grabbing select-none overflow-hidden max-w-[140px] min-w-[100px] h-[75px] group';
+      el.style.backgroundColor = bgColor;
+      el.style.color = textColor;
+      el.setAttribute('draggable', 'true');
+      el.setAttribute('data-item-id', item.id);
+
+      // Render optional image or styled text
+      const imageHTML = item.image 
+        ? `<img src="${item.image}" alt="" class="w-full h-full object-cover absolute inset-0 opacity-90 group-hover:opacity-100 transition-opacity" onerror="this.style.display='none'">` 
+        : '';
+
+      el.innerHTML = `
+        ${imageHTML}
+        
+        <!-- Interactive Left Zone: Change Tier Value / Rating -->
+        <div class="left-zone absolute left-0 top-0 bottom-0 w-1/2 z-10 hover:bg-black/10 transition-colors flex items-center justify-start pl-2 cursor-pointer" title="Click left side to change Tier / Color">
+          <span class="opacity-0 group-hover:opacity-75 transition-opacity text-xs bg-black/60 text-white p-1 rounded-full w-5 h-5 flex items-center justify-center">
+            <i class="fa-solid fa-star text-[10px]"></i>
+          </span>
+        </div>
+
+        <!-- Interactive Right Zone: Change Label Text -->
+        <div class="right-zone absolute right-0 top-0 bottom-0 w-1/2 z-10 hover:bg-black/10 transition-colors flex items-center justify-end pr-2 cursor-pointer" title="Click right side to edit text">
+          <span class="opacity-0 group-hover:opacity-75 transition-opacity text-xs bg-black/60 text-white p-1 rounded-full w-5 h-5 flex items-center justify-center">
+            <i class="fa-solid fa-pen text-[10px]"></i>
+          </span>
+        </div>
+
+        <!-- Text Overlay -->
+        <div class="relative z-0 p-2 w-full text-center font-bold text-xs sm:text-sm tracking-tight leading-tight line-clamp-3 break-words pointer-events-none drop-shadow-sm">
+          ${item.text}
+        </div>
+      `;
+
+      // Event Listeners for Left / Right interactive click zones
+      const leftZone = el.querySelector('.left-zone');
+      const rightZone = el.querySelector('.right-zone');
+
+      leftZone.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openItemModal(item.id, 'tier');
+      });
+
+      rightZone.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openItemModal(item.id, 'text');
+      });
+
+      return el;
+    }
+
+    // Drag & Drop Functionality
+    function attachDragEvents() {
+      const itemElements = document.querySelectorAll('.item-card');
+      const dropZones = document.querySelectorAll('.tier-drop-zone');
+
+      itemElements.forEach(item => {
+        item.addEventListener('dragstart', (e) => {
+          draggedItemId = item.getAttribute('data-item-id');
+          item.classList.add('dragging');
+          e.dataTransfer.setData('text/plain', draggedItemId);
+        });
+
+        item.addEventListener('dragend', () => {
+          item.classList.remove('dragging');
+          draggedItemId = null;
+          dropZones.forEach(zone => zone.classList.remove('drag-over-tier'));
+        });
+      });
+
+      dropZones.forEach(zone => {
+        zone.addEventListener('dragover', (e) => {
+          e.preventDefault();
+          zone.classList.add('drag-over-tier');
+        });
+
+        zone.addEventListener('dragleave', () => {
+          zone.classList.remove('drag-over-tier');
+        });
+
+        zone.addEventListener('drop', (e) => {
+          e.preventDefault();
+          zone.classList.remove('drag-over-tier');
+
+          if (!draggedItemId) return;
+
+          const targetTierId = zone.getAttribute('data-tier-id') || 'unranked';
+          const itemIndex = items.findIndex(i => i.id === draggedItemId);
+
+          if (itemIndex !== -1) {
+            // Update tier assignment
+            items[itemIndex].tierId = targetTierId;
+
+            // Optional reorder logic inside zone
+            const targetItem = e.target.closest('.item-card');
+            if (targetItem && targetItem.getAttribute('data-item-id') !== draggedItemId) {
+              const targetId = targetItem.getAttribute('data-item-id');
+              const targetIdx = items.findIndex(i => i.id === targetId);
+              const [movedItem] = items.splice(itemIndex, 1);
+              items.splice(targetIdx, 0, movedItem);
+            }
+
+            saveData();
+            renderBoard();
+          }
+        });
+      });
+    }
+
+    // Item Modal Controller
+    function openItemModal(itemId, focusField = 'text') {
+      activeEditingItemId = itemId;
+      const item = items.find(i => i.id === itemId);
+      if (!item) return;
+
+      document.getElementById('item-modal-title').textContent = 'Edit Item';
+      document.getElementById('item-text-input').value = item.text || '';
+      document.getElementById('item-image-input').value = item.image || '';
+      document.getElementById('item-color-input').value = item.color || '#3f3f46';
+
+      // Populate Tier options
+      const tierSelect = document.getElementById('item-tier-select');
+      tierSelect.innerHTML = '<option value="unranked">Unranked Pool</option>';
+      tiers.forEach(t => {
+        const option = document.createElement('option');
+        option.value = t.id;
+        option.textContent = `Tier ${t.name}`;
+        if (t.id === item.tierId) option.selected = true;
+        tierSelect.appendChild(option);
+      });
+
+      itemModal.classList.remove('hidden');
+
+      if (focusField === 'text') {
+        document.getElementById('item-text-input').focus();
+        document.getElementById('item-text-input').select();
+      } else {
+        tierSelect.focus();
+      }
+    }
+
+    function closeItemModal() {
+      itemModal.classList.add('hidden');
+      activeEditingItemId = null;
+    }
+
+    // Save Item Settings
+    document.getElementById('btn-save-item').addEventListener('click', () => {
+      if (!activeEditingItemId) {
+        // Creating New Item
+        const newItem = {
+          id: 'item-' + Date.now(),
+          text: document.getElementById('item-text-input').value.trim() || 'New Item',
+          image: document.getElementById('item-image-input').value.trim(),
+          tierId: document.getElementById('item-tier-select').value,
+          color: document.getElementById('item-color-input').getAttribute('data-custom') === 'true' ? document.getElementById('item-color-input').value : null
+        };
+        items.push(newItem);
+        showToast('Item created successfully');
+      } else {
+        // Updating Existing Item
+        const item = items.find(i => i.id === activeEditingItemId);
+        if (item) {
+          item.text = document.getElementById('item-text-input').value.trim() || 'Untitled';
+          item.image = document.getElementById('item-image-input').value.trim();
+          item.tierId = document.getElementById('item-tier-select').value;
+          item.color = document.getElementById('item-color-input').getAttribute('data-custom') === 'true' ? document.getElementById('item-color-input').value : null;
+          showToast('Item updated');
+        }
+      }
+
+      saveData();
+      renderBoard();
+      closeItemModal();
+    });
+
+    // Color input custom flag
+    document.getElementById('item-color-input').addEventListener('change', () => {
+      document.getElementById('item-color-input').setAttribute('data-custom', 'true');
+    });
+
+    document.getElementById('item-color-reset').addEventListener('click', () => {
+      document.getElementById('item-color-input').removeAttribute('data-custom');
+      document.getElementById('item-color-input').value = '#3f3f46';
+      showToast('Color reset to tier default');
+    });
+
+    // Delete Item
+    document.getElementById('btn-delete-item').addEventListener('click', () => {
+      if (activeEditingItemId) {
+        items = items.filter(i => i.id !== activeEditingItemId);
+        saveData();
+        renderBoard();
+        closeItemModal();
+        showToast('Item deleted');
+      }
+    });
+
+    document.getElementById('close-item-modal').addEventListener('click', closeItemModal);
+    document.getElementById('btn-cancel-item').addEventListener('click', closeItemModal);
+
+    // Tier Modal Controller
+    function openTierModal(tierId) {
+      activeEditingTierId = tierId;
+      const tier = tiers.find(t => t.id === tierId);
+      if (!tier) return;
+
+      document.getElementById('tier-name-input').value = tier.name;
+      document.getElementById('tier-color-input').value = tier.color;
+
+      tierModal.classList.remove('hidden');
+      document.getElementById('tier-name-input').focus();
+    }
+
+    function closeTierModal() {
+      tierModal.classList.add('hidden');
+      activeEditingTierId = null;
+    }
+
+    // Save Tier Settings
+    document.getElementById('btn-save-tier').addEventListener('click', () => {
+      if (activeEditingTierId) {
+        const tier = tiers.find(t => t.id === activeEditingTierId);
+        if (tier) {
+          tier.name = document.getElementById('tier-name-input').value.trim() || 'Tier';
+          tier.color = document.getElementById('tier-color-input').value;
+          saveData();
+          renderBoard();
+          showToast('Tier updated');
+        }
+      }
+      closeTierModal();
+    });
+
+    // Preset color buttons inside Tier modal
+    document.querySelectorAll('#preset-colors button').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const color = e.target.getAttribute('data-color');
+        if (color) {
+          document.getElementById('tier-color-input').value = color;
+        }
+      });
+    });
+
+    // Tier Actions: Move Up, Move Down, Clear, Delete
+    document.getElementById('btn-move-tier-up').addEventListener('click', () => {
+      if (!activeEditingTierId) return;
+      const index = tiers.findIndex(t => t.id === activeEditingTierId);
+      if (index > 0) {
+        const temp = tiers[index];
+        tiers[index] = tiers[index - 1];
+        tiers[index - 1] = temp;
+        saveData();
+        renderBoard();
+        showToast('Moved tier up');
+      }
+    });
+
+    document.getElementById('btn-move-tier-down').addEventListener('click', () => {
+      if (!activeEditingTierId) return;
+      const index = tiers.findIndex(t => t.id === activeEditingTierId);
+      if (index !== -1 && index < tiers.length - 1) {
+        const temp = tiers[index];
+        tiers[index] = tiers[index + 1];
+        tiers[index + 1] = temp;
+        saveData();
+        renderBoard();
+        showToast('Moved tier down');
+      }
+    });
+
+    document.getElementById('btn-clear-tier').addEventListener('click', () => {
+      if (!activeEditingTierId) return;
+      items.forEach(i => {
+        if (i.tierId === activeEditingTierId) {
+          i.tierId = 'unranked';
+        }
+      });
+      saveData();
+      renderBoard();
+      showToast('Cleared tier items to pool');
+    });
+
+    document.getElementById('btn-delete-tier').addEventListener('click', () => {
+      if (!activeEditingTierId) return;
+      if (tiers.length <= 1) {
+        showToast('Cannot delete the last tier!');
+        return;
+      }
+      
+      // Move items of deleted tier to unranked
+      items.forEach(i => {
+        if (i.tierId === activeEditingTierId) i.tierId = 'unranked';
+      });
+
+      tiers = tiers.filter(t => t.id !== activeEditingTierId);
+      saveData();
+      renderBoard();
+      closeTierModal();
+      showToast('Tier deleted');
+    });
+
+    document.getElementById('close-tier-modal').addEventListener('click', closeTierModal);
+    document.getElementById('btn-cancel-tier').addEventListener('click', closeTierModal);
+
+    // Toolbar Header Buttons
+    document.getElementById('btn-add-item').addEventListener('click', () => {
+      activeEditingItemId = null;
+      document.getElementById('item-modal-title').textContent = 'Add New Item';
+      document.getElementById('item-text-input').value = '';
+      document.getElementById('item-image-input').value = '';
+      document.getElementById('item-color-input').value = '#3f3f46';
+      document.getElementById('item-color-input').removeAttribute('data-custom');
+
+      const tierSelect = document.getElementById('item-tier-select');
+      tierSelect.innerHTML = '<option value="unranked">Unranked Pool</option>';
+      tiers.forEach(t => {
+        const option = document.createElement('option');
+        option.value = t.id;
+        option.textContent = `Tier ${t.name}`;
+        tierSelect.appendChild(option);
+      });
+
+      itemModal.classList.remove('hidden');
+      document.getElementById('item-text-input').focus();
+    });
+
+    document.getElementById('btn-add-tier').addEventListener('click', () => {
+      const newTierId = 'tier-' + Date.now();
+      const defaultColors = ['#ff7f7f', '#ffbf7f', '#ffdf7f', '#ffff7f', '#bfff7f', '#7fff7f', '#7fbfff', '#ff7fff'];
+      const randomColor = defaultColors[Math.floor(Math.random() * defaultColors.length)];
+      
+      tiers.push({
+        id: newTierId,
+        name: 'NEW',
+        color: randomColor
+      });
+
+      saveData();
+      renderBoard();
+      showToast('New tier added');
+    });
+
+    document.getElementById('btn-reset').addEventListener('click', () => {
+      if (confirm('Are you sure you want to reset all tiers and items to default?')) {
+        tiers = JSON.parse(JSON.stringify(DEFAULT_TIERS));
+        items = JSON.parse(JSON.stringify(DEFAULT_ITEMS));
+        saveData();
+        renderBoard();
+        showToast('Reset board to default');
+      }
+    });
+
+    // Export Board as Image using html2canvas
+    document.getElementById('btn-export').addEventListener('click', () => {
+      const board = document.getElementById('tier-board');
+      showToast('Generating image preview...');
+
+      html2canvas(board, {
+        backgroundColor: '#0d0d11',
+        scale: 2,
+        useCORS: true
+      }).then(canvas => {
+        const link = document.createElement('a');
+        link.download = 'tier-list.png';
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+        showToast('Tier list downloaded!');
+      }).catch(err => {
+        console.error(err);
+        showToast('Failed to export image.');
+      });
+    });
+
+    // Notification Toast System
+    function showToast(message) {
+      const toastContainer = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      toast.className = 'bg-zinc-800 border border-zinc-700 text-white text-xs px-3 py-2 rounded-lg shadow-xl flex items-center gap-2 animate-bounce pointer-events-auto';
+      toast.innerHTML = `<i class="fa-solid fa-circle-info text-indigo-400"></i> ${message}`;
+
+      toastContainer.appendChild(toast);
+      setTimeout(() => {
+        toast.remove();
+      }, 2500);
+    }
+
+    // Keyboard Shortcuts (Esc to close modals)
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        closeItemModal();
+        closeTierModal();
+      }
+    });
+
+    // Initialize application on page load
+    window.onload = function() {
+      renderBoard();
+    };
+  </script>
+</body>
+</html>
